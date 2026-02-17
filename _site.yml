@@ -1,0 +1,12 @@
+name: "joela-website"
+title: "Joela Quartey"
+description: |
+  Joela Quartey
+output_dir: "_site"
+navbar:
+  right:
+    - text: "Home"
+      href: index.html
+    - text: "GV300 Showcase"
+      href: gv300-showcase.html
+      

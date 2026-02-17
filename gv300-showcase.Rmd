@@ -1,0 +1,87 @@
+---
+title: "GV300 Showcase"
+description: "selected work from one of my GV300 assignments"
+author:
+  - name: "Joela Quartey"
+date: "`r Sys.Date()`"
+output: distill::distill_article
+---
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(tidyverse)
+library(patchwork)
+
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 8,
+  fig.height = 5
+)
+
+```
+
+# Introduction 
+This page showcases my work form assignment 2, where I was instructed to create a new visualization between constituency size distribution. So I coded a box blot where it allowed you to directly compare constituency sizes across all four countries within the united kingdom. 
+
+# Code Example
+
+# Importing the data from that assignment
+```{r first, eval=TRUE}
+# uk <- read_csv("uk_election_data.csv")
+uk_csv <- "https://electionresults.parliament.uk/general-elections/6/candidacies.csv"
+uk_raw <- readr::read_csv(uk_csv, show_col_types = FALSE)
+names(uk_raw) <- names(uk_raw) %>% tolower() %>% str_replace_all("\\s+", "_")
+```
+
+# cleaning the data 
+```{r cleaning, eval=TRUE}
+# Clean the data
+uk1 <- uk_raw %>%
+  filter(!`election_is_by-election`)
+
+uk2 <- uk1 %>%
+  select(
+    constituency = constituency_name,
+    country      = country_name,
+    valid_votes  = candidate_vote_count,
+    electorate   = electorate
+  )
+
+uk3 <- uk2 %>%
+  group_by(country, constituency) %>%
+  summarise(
+    valid_votes = sum(valid_votes, na.rm = TRUE),
+    electorate  = max(electorate, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+uk <- uk3 %>%
+  mutate(turnout_registered = 100 * valid_votes / electorate) %>%
+  filter(is.finite(turnout_registered), electorate > 0)
+
+
+overall_mean <- mean(uk$valid_votes, na.rm = TRUE)
+```
+
+# The visualisation of the plot 
+```{r plot2, eval=TRUE}
+
+ggplot(uk, aes(x = country, y = valid_votes)) + 
+  geom_boxplot( fill= "steelblue", alpha = 0.7 ) + 
+  geom_hline(yintercept = overall_mean, 
+            color = "red", linetype = "dashed") +
+  labs(
+    title = "Distribution of Constituency Sizes by Country",
+    subtitle = "Red line shows overall UK mean",
+    x = "Count of Constituency",
+    y = "Number of Valid Voters") + 
+    theme_minimal()+
+    theme(
+   plot.title = element_text(face = "bold", size = 14),    strip.text = element_text(face = "bold")
+    )
+```
+
+# Analysis 
+The code was able to produce a box plot which allows for the clear comparison of the median values and variance, the UK mean was shown by the red dash line which made it easier to evaluate how each country compares against the national average.The graph was able to show that The country with the most equal sized constituency is Northern Ireland as the box is smaller meaning each number of constituencies are likely to have the same number of votes. The country with unequal amount of constituencies is England as the box is bigger showing a wider range of constituency sizes. Two variables that would be a strong predictor of constituency size would be that larger constituencies have more voter due to it being highly populated and needing representation whereas areas that are not as populated would have smaller constituencies there is also the fact that it depends of the geographical area of the constituencies.

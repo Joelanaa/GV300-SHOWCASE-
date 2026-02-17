@@ -1,0 +1,17 @@
+---
+title: "Joela Quartey"
+image: "joela.jpg"
+links:
+  - label: LinkedIn
+    url: "https://www.linkedin.com/in/joela-quartey-a51880347"
+  - label: GitHub
+    url: "https://github.com/Joelanaa"
+  - label: Email
+    url: "mailto:joelaquartey18@email.com"
+site: distill::distill_website
+output:
+  postcards::jolla
+---
+ 
+I am an economics and politics student currently studying at the University of Essex. 
+I hope to establish a career of being a diplomat or working in the United Nations. I love reading, taking part in an sports especially athletics, and taking care of my nieces.
