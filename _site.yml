@@ -2,7 +2,7 @@ name: "joela-website"
 title: "Joela Quartey"
 description: |
   Joela Quartey
-output_dir: "_site"
+output_dir: "docs"
 
 navbar:
   right:
