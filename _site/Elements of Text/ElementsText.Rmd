@@ -1,0 +1,184 @@
+
+---
+title: 'GV300 Week 17: Elements of Textual Data'
+author: 'Nicole Baerg, Department of Government'
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+    theme: cosmo
+    highlight: tango
+    df_print: paged
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+# clear memory
+# rm(list=ls())
+library(quanteda)
+library(readtext)
+library(ggplot2)
+library(ggthemes)
+```
+
+
+## Building a corpus from UK manifestos 
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+manifestos <- readtext("UK Manifestos/*.txt", docvarsfrom = c("filenames"))
+# the argument docvarsfrom= allows us to use the filenames as document ids 
+# there should be 69 of them
+manifestos #to check
+# '> corpusSource object containing 69 texts and 1 docvar.'
+# We need to turn the text files into a 'corpus' 
+manifestos_corpus <- corpus(manifestos, docnames = manifestos$doc_id)
+# just make sure the docnames are as expected (is being corrected in rebuild)
+docnames(manifestos_corpus)
+
+# summary of the corpus information: tokens and types
+ntk <- ntoken(manifestos_corpus) # tokes per document
+ntps <- ntype(manifestos_corpus) # types per document
+```
+
+Difference between types and tokens. "My name is Sam, Sam I am. I do not like Green Eggs and Ham."
+
+1. How many tokens?
+2. How many types?
+
+We want to think about summarizing the corpus, for example, may want to consider whether UK party manifestos getting longer or shorter over time? We can look at the number of sentences for each manifesto
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+# summary( manifestos_corpus)
+num_sentences <- nsentence(manifestos_corpus)
+#need to grab the dates of the manifestos. We could have added that via docvars()<-
+#but let's just do a bit of regex, so you've seen it at work
+nms <- names (manifestos_corpus) # names
+Dates <- as.numeric(gsub('[^[:digit:]]','', nms))
+Dates
+```
+
+Then we might want to plot them either in base plot or using ggplot if we want to make it a bit nicer looking 
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+plot(Dates, num_sentences, pch=16, ylab = "Number of Sentences", xlab = "Year")
+```
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+info_summary <- data.frame(Dates = Dates, Sentences = num_sentences)
+head(info_summary)
+info_summary[69,]
+ggplot(data=info_summary, aes(x=Dates, y=Sentences, group=1)) +  geom_point() +    
+  theme_hc()
+```
+
+## Looking inside the Documents 
+
+To see this, lets grab the Labour 1983 manifesto alone 
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+Lab_1983 <- corpus_subset(manifestos_corpus, docvar1=="Lab1983")
+summary(Lab_1983)
+```
+Now we want to 'tokenize'
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+tokens_all <- tokens(Lab_1983) #this defaults to the /word/ level
+#how many  are there?
+length(tokens_all[[1]]) #~25k?
+#what about _unique_ tokens (basically the 'types' in this context)
+length(unique(tokens_all[[1]])) #~3.6k
+```
+
+Lets not bother with punctuation. Note that your research question should drive this choice and length of your documents might play a role. Please see [DennySpirling](https://www.cambridge.org/core/journals/political-analysis/article/abs/text-preprocessing-for-unsupervised-learning-why-it-matters-when-it-misleads-and-what-to-do-about-it/AA7D4DE0AA6AB208502515AE3EC6989E) for more information. 
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+tokens_nopunc <- tokens(Lab_1983, remove_punct=T)
+#can check
+length(tokens_nopunc[[1]]) #~22.5k
+```
+
+and maybe we could remove numbers too. 
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+tokens_nopunc_nonum <- tokens(Lab_1983, remove_punct=T, remove_number=T)
+#can check
+length(tokens_nopunc_nonum[[1]]) #~22.4k
+```
+
+what if we wanted bigrams (only) instead of unigrams?
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+toks_ngram <- tokens_ngrams(tokens_nopunc_nonum, n = 2)
+head(toks_ngram[[1]], 30)
+```
+
+While tokens_ngrams() generates n-grams or skip-grams in all possible combinations of tokens, tokens_compound() generates n-grams more selectively. For example, you can make negation bi-grams using phrase() and a wild card (*).
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+toks_neg_bigram <- tokens_compound(tokens_nopunc_nonum, pattern = phrase("not *"))
+toks_neg_bigram_select <- tokens_select(toks_neg_bigram, pattern = phrase("not_*"))
+head(toks_neg_bigram_select[[1]], 30)
+```
+
+Note that the material in Quanteda recommend using the *tokens_compound* command to get top tokens rather than the *tokens_ngrams*. 
+
+## Stemming 
+
+let's stem the document (uses Porter stemmer). You can see what package this is coming from an what stemmer it is using by doing ?tokens_wordstem
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+stemmed <- tokens_wordstem(tokens_all) #can inspect directly, if desired.
+# to see what's happened in practice, let's compare 'family' and 'families'.
+# So, compare
+tokens_all[[1]][grep("fam",tokens_all[[1]])]
+# to
+stemmed[[1]][grep("fam",stemmed[[1]])]
+```
+
+## Stopwords
+
+we might also want to remove the stopwords. Note that there are other language options also. Note that there is no definitive list of stopwords and the stopwords that you use can also matter. 
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+stopwords("english")
+#and for that matter
+stopwords("german")
+```
+
+## Vector Space Representation 
+
+```{r, results = 'hide', echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+Lab_1983 <- corpus_subset(manifestos_corpus, docvar1=="Lab1983")
+Lab1983_vector <- tokens(Lab_1983)
+Lab1983_vector <- tokens_wordstem(Lab1983_vector)
+Lab1983_vector <- dfm(Lab1983_vector, tolower = TRUE)
+head(Lab1983_vector)
+```
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+#alright, let's make a dfm of our whole Manifestos collection
+
+manifestos <- readtext("UK Manifestos/*.txt", docvarsfrom = c("filenames"))
+manifestos <- corpus(manifestos)
+
+dfmat_man <- tokens(manifestos, remove_punct = TRUE) |>
+  tokens_remove(stopwords("en")) |>
+  dfm()
+dfmat_man
+
+dfmat_man <- tokens(manifestos, remove_punct = TRUE) |>
+  tokens_remove(stopwords("en")) |>
+  dfm()
+dfmat_man
+
+dfmat_man_weighted <- dfm_tfidf(dfmat_man)
+
+topfeatures(dfmat_man)
+#with
+topfeatures(dfmat_man_weighted)
+# What is the main difference here?
+```
+

@@ -1,0 +1,224 @@
+---
+title: 'GV300 Week 17: Elements of Textual Data'
+author: 'Nicole Baerg, Department of Government'
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+    theme: cosmo
+    highlight: tango
+    df_print: paged
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+# install.packages(c('caret','pander','gmodels','e1071','RTextTools'))
+# rm(list=ls())
+
+library(stringr)
+library(car)
+library(dplyr)
+ 
+#For Text Classification
+library(quanteda)
+library(readtext)
+library(quanteda.textmodels)
+```
+
+
+## Topic 1: Naive Bayes
+
+
+### Simple Naive Bayes example with Quanteda 
+
+First, lets load in Data and Turn into a corpus object using quanteda
+
+```{r}
+speeches <- readtext("Concession Speeches/*.txt")  #astrix means take everything
+speeches
+speeches_corpus <- corpus(speeches) # Corpus collection of documents
+speeches_corpus
+
+as.character(speeches_corpus[4]) # HILLARY CLINTON
+
+typeof(speeches_corpus)
+
+summary(speeches_corpus) # overview information 
+```
+
+Let's add some information that we can use from this data. Notice that we can get information from the filenames  
+
+```{r}
+nms <-names(speeches_corpus) #Get Filenames from corpus object
+nms
+speeches_corpus$Dates  <- paste(as.numeric(gsub('[^[:digit:]]','', names(speeches_corpus)))) # Get dates from file object
+speeches_corpus$Party <- str_sub(nms, start= -5, -5) # Get Party ID from file object, fifth from end
+speeches_corpus$PNames <- str_sub(nms, end = -12) #Get Name from file object
+summary(speeches_corpus)
+```
+
+Because we want to run a predictive models, probably want more data than 19 documents. Using quanteda, we can easily transform the corpus from the document level into the paragraph level and keep the doc variables 
+
+```{r}
+speeches_paragraph <- corpus_reshape(speeches_corpus, to = "paragraphs", use_docvars = TRUE) # Can also change to sentences
+summary(speeches_paragraph)
+```
+
+Now we have a corpus consisting of 337 documents! Another thing that we may need to consider is the class balance. There is a really good tutorial on class balance using quanteda here [Predicting Male and Female Speakers in TED Talks](https://towardsdatascience.com/predicting-male-and-female-speakers-in-ted-talks-a2deb0ae84b) 
+
+```{r}
+table(speeches_paragraph$Party) # Check for Balance in Party Labels 
+#Dems 157
+#Reps  180 # Slightly more Republicans
+prop.d <- 157/337
+prop.r <- 1-prop.d
+prop.d 
+prop.r 
+
+#So what we can see is that there is a slight imbalance with our data, with more data from the Reps. We might expect that the classifier will over predict
+#the dominant class. Lets check this. 
+```
+
+###  Lets clean the dataset 
+
+```{r}
+speech_tokens <- tokens(speeches_paragraph, remove_punct = TRUE, remove_symbols = TRUE, split_hyphens = TRUE, remove_numbers = TRUE) #turn them into individual words and punctuation
+speech_tokens #As we can see here, we now have a list of words
+speeches_clean <- tokens_wordstem(speech_tokens) # stem the words getting rid of endings
+speeches_clean <- tokens_remove(speeches_clean, pattern = c("applpaus", "applause")) #misspelling
+speeches_clean <- tokens_select(speeches_clean, c("*st", "*th", "*rd"), selection = "remove") # get rid of special endings like 43rd
+```
+
+```{r}
+speeches_clean <- dfm(speeches_clean)
+
+speeches_clean <- dfm_remove(speeches_clean,
+                      stopwords("english"))
+
+speeches_clean <- speeches_clean[, order(featnames(speeches_clean))]
+speeches_clean
+```
+There are of course other things that we may want to do to this DFM before we move onto the modeling stage, but this is just a reminder of the processing steps. What you do before modeling is always going to have downstream effects, so make sure that you are doing what makes sense in your particular topic. 
+
+### Running our first Naive Bayes model
+
+Splitting the test and training step. For your own work, you probably want to consider using a training, development, and testing set. Here we are taking a straight 80/20 split 
+
+```{r}
+Concession_dfm_train <- speeches_clean[1:268, ] #80% of total observations
+Concession_dfm_test <- speeches_clean[269:337, ] #20% of total observations
+Concession_train_labels <- speeches_paragraph$Party[1:268]
+Concession_test_labels <- speeches_paragraph$Party[269:337]
+Concession_dfm_train
+Concession_train_labels[1:10]
+```
+
+Now we are going to apply a Naive Bayes model using Quanteda
+
+```{r}
+?textmodel_nb
+```
+
+Naive Bayes is a generative model that makes the bag of words assumption (position doesn’t matter) and the conditional independence assumption (words are conditionally independent of each other given the class). If you think phrases matter, I would include them first in your dfm and treat them like a feature. 
+
+```{r}
+nb_model <- textmodel_nb(Concession_dfm_train, docvars(Concession_dfm_train, "Party"))
+summary(nb_model)
+```
+
+What do we do about words that occur in our test data but are not in our vocabulary at all because they did not occur in any training document in any class? The unknown word solution for such unknown words is to ignore them—remove them from the test document and not include any probability for them at all
+
+```{r}
+dfmat_matched <- dfm_match(Concession_dfm_test, features = featnames(Concession_dfm_train)) #forcing keeping only features
+actual_class <- dfmat_matched$Party
+predicted_class <- predict(nb_model, newdata = dfmat_matched)
+```
+
+### Evaluation of model output 
+
+To evaluate any system for detecting things, we start by building a confusion matrix. A confusion matrix confusion matrix is a table for visualizing how an algorithm performs with respect to the ``human gold-standard'' labels, using two dimensions (system output and gold labels), and each cell labeling a set of possible outcomes.
+
+
+top left: true positive
+bottom left: false negative
+
+top right: false negative
+bottom right: true negative
+
+```{r}
+tab_class <- table(predicted_class, actual_class)
+tab_class
+```
+
+#Accuracy, Precision, Recall
+
+```{r}
+cfm <- confusionMatrix(tab_class, mode="everything")
+cfm
+```
+
+Accuracy asks what percentage of all the observations our system labeled correctly. Although accuracy might seem a natural metric, we generally don’t use it for text classification tasks. That’s because accuracy doesn’t work well when the classes are unbalanced. Our data wasn't so imbalanced so thats something to think about. 
+
+That’s why instead of accuracy we generally turn to two other metrics: precision and recall. Precision measures the percentage of the items that the system detected (i.e., the system labeled as positive) that are in fact positive (i.e.,
+are positive according to the human gold labels). Recall measures the percentage of items actually present in the input that were correctly identified by the system
+
+### Try recoding with Boolean
+
+For text classification tasks, whether a word occurs or not sometimes matters more than its frequency. Thus it often improves performance to clip the word counts in each document at 1. 
+
+```{r}
+?dfm_weight
+
+speeches_clean_bool <- dfm_weight(speeches_clean, scheme = "boolean") # recode all non-zero counts as 1
+
+
+Concession_dfm_bool_train <- speeches_clean_bool[1:268, ] #80% of total observations
+Concession_dfm_bool_test <- speeches_clean_bool[269:337, ] #20% of total observations
+
+
+Concession_train_labels <- speeches_paragraph$Party[1:268]
+Concession_test_labels <- speeches_paragraph$Party[269:337]
+
+nb_model_bool <- textmodel_nb(Concession_dfm_bool_train, docvars(Concession_dfm_train, "Party"), distribution = "multinomial")
+summary(nb_model_bool)
+
+dfmat_matched <- dfm_match(Concession_dfm_bool_test, features = featnames(Concession_dfm_bool_train)) #forcing keeping only features
+
+actual_class <- dfmat_matched$Party
+predicted_class <- predict(nb_model_bool, newdata = dfmat_matched)
+
+tab_class <- table(predicted_class, actual_class)
+tab_class
+
+cfm <- confusionMatrix(tab_class, mode="everything")
+cfm
+```
+
+### Bernoulli Naive Bayes
+
+In the multivariate Bernoulli model, features are independent Booleans (binary variables) describing inputs. Like the multinomial model, this model is popular for document classification tasks, where binary term occurrence features are used rather than term frequencies.  This model is especially popular for classifying short texts. It has the benefit of explicitly modelling the absence of terms. Note that a Naive Bayes classifier with a Bernoulli model is not the same as a multinomial NB classifier with frequency counts truncated to one.
+
+```{r}
+nb_model_bern <- textmodel_nb(Concession_dfm_bool_train, docvars(Concession_dfm_train, "Party"), distribution = "Bernoulli")
+summary(nb_model_bern)
+
+dfmat_matched <- dfm_match(Concession_dfm_bool_test, features = featnames(Concession_dfm_bool_train)) #forcing keeping only features
+
+actual_class <- dfmat_matched$Party
+predicted_class <- predict(nb_model_bern, newdata = dfmat_matched)
+
+
+tab_class <- table(predicted_class, actual_class)
+tab_class
+
+cfm <- confusionMatrix(tab_class, mode="everything")
+cfm
+```
+
