@@ -1,9 +1,6 @@
 ---
 title: "GV300 Showcase"
 description: "selected work from one of my GV300 assignments"
-author:
-  - name: "Joela Quartey"
-date: "`r Sys.Date()`"
 output: distill::distill_article
 ---
 

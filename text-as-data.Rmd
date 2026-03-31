@@ -1,0 +1,871 @@
+---
+title: "Text as Data"
+output: distill::distill_article
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# Introduction
+
+this page provides a textual analysis of FOMC policy statements using dictionary approaches. the aim being finding trends in inflation, uncertainty, and economic output language. The analysis builds document-feature matrices, applies dictionaries to measure particular themes, and tokenises text using the quanteda package
+
+# Dictionary Approaches to Text
+
+## Applying dictionaries to FOMC policy statements 
+
+In this example, we are going to look at the use of uncertainty language as well as output and inflation topics in a subsection of Federal Open Market Committee (FOMC) statements made by the U.S. central bank.  
+
+Because the filenames actually have the date of the meeting, we are going to collect the filenames in an object
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+library(quanteda)
+require(ggplot2)
+library(readtext)
+filenames <- list.files("FOMC", "\\.txt$") 
+```
+
+Then what we are going to do is to read in a bunch of the FOMC statements
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+txts <-  readtext(paste0("FOMC",  "/", "*.txt"))[]
+str(txts)
+substring(texts(txts)["2005_02_1.txt"], 1, 150)
+```
+
+# Creating the Corpus 
+
+This step loads the FOMC statements and converts them into a corpus object, which allows us to analyse the text systematically.
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+txtCorpus <- corpus(txts)
+head(summary(txtCorpus))
+```
+
+Then we might want to add in doc-level meta-info (Note that this was disabled in the current version [(4.0.2](https://quanteda.io/news/news-3.0.html?q=metadoc#removals)
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+#metadoc(txtCorpus, "language") <- "english"
+#metadoc(txtCorpus, "owner") <- "Nicole Rae Baerg"
+#metadoc(txtCorpus, "docsource")  <- paste("txts", 1:ndoc(txtCorpus))
+#head(summary(txtCorpus, showmeta = TRUE))
+```
+### Key words in context
+
+To make sure that the statement has information about the economy and uncertainty, we might want to check using our KWIC command 
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+#key-words in context
+options(width = 30)
+might <- kwic(tokens(txtCorpus), "might")
+head(might)
+```
+
+
+### DFM
+
+
+We want to tokenize our text. This is how we would do it (note concatenator for the n-grams)
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+tokensFromCorp <- tokens(txtCorpus) 
+dfmCorp <- dfm(tokensFromCorp)
+topfeatures(dfmCorp, 20)
+```
+### Making a Dictionary 
+
+
+In order to show how to apply a dictionary, we are going to import a dictionary which is already a list. In this case, we will use the uncertainty dictionary from the finance literature.
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+test_dict <- dictionary(list(specific = c("clear*", "certain*", "unequi*"),
+                          vague = c("probably", "uncert*", "might", "could")))
+precision <- dfm_lookup(dfmCorp, dictionary = test_dict)
+
+tail(precision)
+
+test_dict2 <- dictionary(list(consumerinflation = c("inflation", "price", "cost", "housing"), output = c("growth", "gap", "employment", "output gap"), producerinflation = c("oil", "trucks", "tarrif")))
+
+topics <- dfm_lookup(dfmCorp, dictionary = test_dict2)
+head(topics)
+
+test_sentiment <- dictionary(list(positive = c("agree", "yes", "happy"), negative = c("sad", "disagree", "no"), neutral = c("ambiguous", "maybe", "content")))
+sentiment <- dfm_lookup(dfmCorp, dictionary = test_sentiment)
+sentiment
+
+```
+
+We have to make sure that this is a dictionary object. The next thing that we will do is to make the dfm using only the terms that appear in our dictionary. We build a new list of uncertainty words that start with the letter a and call this our A uncertainty dictionary'. 
+
+### Dictionary
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+#read in dictionary - would need files of type YOSHIKODER
+Uncertaintydict <- dictionary(list(uncertainty = c("abeyance",
+"abeyances",
+"almost",
+"alteration",
+"alterations",
+"ambiguities",
+"ambiguity",
+"ambiguous",
+"anomalies",
+"anomalous",
+"anomalously",
+"anomaly",
+"anticipate",
+"anticipated",
+"anticipates",
+"anticipating",
+"anticipation",
+"anticipations",
+"apparent",
+"apparently",
+"appear",
+"appeared",
+"appearing",
+"appears",
+"approximate",
+"approximated",
+"approximately",
+"approximates",
+"approximating",
+"approximation",
+"approximations",
+"arbitrarily",
+"arbitrariness",
+"arbitrary",
+"assume",
+"assumed",
+"assumes",
+"assuming",
+"assumption",
+"assumptions"),
+inflation = c("inflation", "price", "cost", "oil", "housing"), output = c("growth", "gap", "employment")))
+```
+### Applying Dictionary to DFM 
+
+```{r, echo=FALSE, message = FALSE, error = FALSE, warning = FALSE}
+uncertainty <- dfm_lookup(dfmCorp, dictionary = Uncertaintydict) 
+head(uncertainty)
+```
+Adding more words to make it a longer dictionary 
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+UncertaintydictL <- dictionary(list(uncertainty =  c("vague", "vaguely",
+	"vagueness",
+	"vaguenesses",
+	"vaguer",
+	"vaguest",
+	"unforecasted",
+	"unforseen",
+	"unpredicted",
+	"unquantifiable",
+	"unquantified",
+	"unreconciled",
+	"abeyance",
+	"abeyances",
+	"almost",
+	"alteration",
+	"alterations",
+	"ambiguities",
+	"ambiguity",
+	"ambiguous",
+	"anomalies",
+	"anomalous",
+	"anomalously",
+	"anomaly",
+	"anticipate",
+	"anticipated",
+	"anticipates",
+	"anticipating",
+	"anticipation",
+	"anticipations",
+	"apparent",
+	"apparently",
+	"appear",
+	"appeared",
+	"appearing",
+	"appears",
+	"approximate",
+	"approximated",
+	"approximately",
+	"approximates",
+	"approximating",
+	"approximation",
+	"approximations",
+	"arbitrarily",
+	"arbitrariness",
+	"arbitrary",
+	"assume",
+	"assumed",
+	"assumes",
+	"assuming",
+	"assumption",
+	"assumptions",
+	"believe",
+	"believed",
+	"believes",
+	"believing",
+	"cautious",
+	"cautiously",
+	"cautiousness",
+	"clarification",
+	"clarifications",
+	"conceivable",
+	"conceivably",
+	"conditional",
+	"conditionally",
+	"confuses",
+	"confusing",
+	"confusingly",
+	"confusion",
+	"contingencies",
+	"contingency",
+	"contingent",
+	"contingently",
+	"contingents",
+	"could",
+	"crossroad",
+	"crossroads",
+	"depend",
+	"depended",
+	"dependence",
+	"dependencies",
+	"dependency",
+	"dependent",
+	"depending",
+	"depends",
+	"destabilizing",
+	"deviate",
+	"deviated",
+	"deviates",
+	"deviating",
+	"deviation",
+	"deviations",
+	"differ",
+	"differed",
+	"differing",
+	"differs",
+	"doubt",
+	"doubted",
+	"doubtful",
+	"doubts",
+	"exposure",
+	"exposures",
+	"fluctuate",
+	"fluctuated",
+	"fluctuates",
+	"fluctuating",
+	"fluctuation",
+	"fluctuations",
+	"hidden",
+	"hinges",
+	"imprecise",
+	"imprecision",
+	"imprecisions",
+	"improbability",
+	"improbable",
+	"incompleteness",
+	"indefinite",
+	"indefinitely",
+	"indefiniteness",
+	"indeterminable",
+	"indeterminate",
+	"inexactv",
+	"inexactness",
+	"instabilities",
+	"instability",
+	"intangible",
+	"intangibles",
+	"likelihood",
+	"may",
+	"maybe",
+	"might",
+	"nearly",
+	"nonassessable",
+	"occasionally",
+	"ordinarily",
+	"pending",
+	"perhaps",
+	"possibilities",
+	"possibility",
+	"possible",
+	"possibly",
+	"precaution",
+	"precautionary",
+	"precautions",
+	"predict",
+	"predictability",
+	"predicted",
+	"predicting",
+	"prediction",
+	"predictions",
+	"predictive",
+	"predictor",
+	"predictors",
+	"predicts",
+	"preliminarily",
+	"preliminary",
+	"presumably",
+	"presume",
+	"presumed",
+	"presumes",
+	"presuming",
+	"presumption",
+	"presumptions",
+	"probabilistic",
+	"probabilities",
+	"probability",
+	"probable",
+	"probably",
+	"random",
+	"randomize",
+	"randomized",
+	"randomizes",
+	"randomizing",
+	"randomly",
+	"randomness",
+	"reassess",
+	"reassessed",
+	"reassesses",
+	"reassessing",
+	"reassessment",
+	"reassessments",
+	"recalculate",
+	"recalculated",
+	"recalculates",
+	"recalculating",
+	"recalculation",
+	"recalculations",
+	"reconsider",
+	"reconsidered",
+	"reconsidering",
+	"reconsiders",
+	"reexamination",
+	"reexamine",
+	"reexamining",
+	"reinterpret",
+	"reinterpretation",
+	"reinterpretations",
+	"reinterpreted",
+	"reinterpreting",
+	"reinterprets",
+	"revise",
+	"revised",
+	"risk",
+	"risked",
+	"riskier",
+	"riskiest",
+	"riskiness",
+	"risking",
+	"risks",
+	"risky",
+	"roughly",
+	"rumors",
+	"seems",
+	"seldom",
+	"seldomly",
+	"sometime",
+	"sometimes",
+	"somewhat",
+	"somewhere",
+	"speculate",
+	"speculated",
+	"speculates",
+	"speculating",
+	"speculation",
+	"speculations",
+	"speculative",
+	"speculatively",
+	"sporadic",
+	"sporadically",
+	"sudden",
+	"suddenly",
+	"suggest",
+	"suggested",
+	"suggesting",
+	"suggests",
+	"susceptibility",
+	"tending",
+	"tentative",
+	"tentatively",
+	"turbulence",
+	"uncertain",
+	"uncertainly",
+	"uncertainties",
+	"uncertainty",
+	"unclear",
+	"unconfirmed",
+	"undecided",
+	"undefined",
+	"undesignated",
+	"undetectable",
+	"undeterminable",
+	"undetermined",
+	"undocumented",
+	"unexpected",
+	"unexpectedly",
+	"unfamiliar",
+	"unfamiliarity",
+	"unguaranteed",
+	"unhedged",
+	"unidentifiable",
+	"unidentified",
+	"unknown",
+	"unknowns",
+	"unobservable",
+	"unplanned",
+	"unpredictability",
+	"unpredictable",
+	"unpredictably",
+	"unproved",
+	"unproven",
+	"unseasonable",
+	"unseasonably",
+	"unsettled",
+	"unspecific",
+	"unspecified",
+	"untested",
+	"unusual",
+	"unusually",
+	"unwritten",
+	"vagaries",
+	"variability",
+	"variable",
+	"variables",
+	"variably",
+	"variance",
+	"variances",
+	"variant",
+	"variants",
+	"variation",
+	"variations",
+	"varied",
+	"varies",
+	"vary",
+	"varying",
+	"volatile",
+	"volatilities",
+	"volatility")))
+```
+```{r, echo=FALSE, message = FALSE, error = FALSE, warning = FALSE}
+uncertainty2 <- dfm_lookup(dfmCorp, dictionary = UncertaintydictL) 
+head(uncertainty2)
+```
+
+
+## Validation of Dictionary 
+How might you go about validating a dictionary? How do you know that the dictionary that you have is the right one? Of course in Political Science, there are a very large number of papers  that use dictionaries
+
+1. Show can show that it measures the same thing as something else but better 2. Human coders to code and see if the same
+3. Differentiate better than others, i.e. more accurate 
+4. Predictive validity (show that it can predict something that it should)
+5. Show that it's more parsimonious than others 
+## Critiques of Sentiment Dictionaries and Coding for Sentiment using BERT and ML models
+1. Don't deal with stance very well (Bestvater and Monroe, 2023)
+
+### ELEMENTS OF TEXT
+
+loading the packages required 
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+# clear memory
+# rm(list=ls())
+library(quanteda)
+library(readtext)
+library(ggplot2)
+library(ggthemes)
+```
+
+## Building a corpus from UK manifestos
+
+This step converts the dataframe into a quanteda corpus object.
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+manifestos <- readtext("UK Manifestos/*.txt", docvarsfrom = c("filenames"))
+# the argument docvarsfrom= allows us to use the filenames as document ids 
+# there should be 69 of them
+manifestos #to check
+# '> corpusSource object containing 69 texts and 1 docvar.'
+# We need to turn the text files into a 'corpus' 
+manifestos_corpus <- corpus(manifestos, docnames = manifestos$doc_id)
+# just make sure the docnames are as expected (is being corrected in rebuild)
+docnames(manifestos_corpus)
+
+# summary of the corpus information: tokens and types
+ntk <- ntoken(manifestos_corpus) # tokes per document
+ntps <- ntype(manifestos_corpus) # types per document
+```
+Difference between types and tokens. "My name is Sam, Sam I am. I do not like Green Eggs and Ham."
+
+1. there are 25,131 tokens 
+2. There are 3,673 types. 
+
+We want to think about summarizing the corpus, for example, may want to consider whether UK party manifestos getting longer or shorter over time? We can look at the number of sentences for each manifesto
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+# summary( manifestos_corpus)
+num_sentences <- nsentence(manifestos_corpus)
+#need to grab the dates of the manifestos. We could have added that via docvars()<-
+#but let's just do a bit of regex, so you've seen it at work
+nms <- names (manifestos_corpus) # names
+Dates <- as.numeric(gsub('[^[:digit:]]','', nms))
+Dates
+```
+Then we are going to plot them within a diagram. Below show a 2 scatter plots the second one is an improved version of the first 
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+plot(Dates, num_sentences, pch=16, ylab = "Number of Sentences", xlab = "Year")
+```
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+info_summary <- data.frame(Dates = Dates, Sentences = num_sentences)
+head(info_summary)
+info_summary[69,]
+ggplot(data=info_summary, aes(x=Dates, y=Sentences, group=1)) +  geom_point() +    
+  theme_hc()
+```
+## Looking inside the Documents 
+
+This shows the Labour 1983 manifesto by itself.
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+Lab_1983 <- corpus_subset(manifestos_corpus, docvar1=="Lab1983")
+summary(Lab_1983)
+```
+Now we want to 'tokenize' which includes spliting texts into word. So from this you will be able to see the total amount of words compared to the unique words = 25131 vs 3673 
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+tokens_all <- tokens(Lab_1983) #this defaults to the /word/ level
+#how many  are there?
+length(tokens_all[[1]]) #~25k?
+#what about _unique_ tokens (basically the 'types' in this context)
+length(unique(tokens_all[[1]])) #~3.6k
+```
+
+This steps removes punctuations and the total puntation = 22513
+  
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+tokens_nopunc <- tokens(Lab_1983, remove_punct=T)
+#can check
+length(tokens_nopunc[[1]]) #~22.5k
+```
+
+this step removes the remove numbers too = 22396.  
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+tokens_nopunc_nonum <- tokens(Lab_1983, remove_punct=T, remove_number=T)
+#can check
+length(tokens_nopunc_nonum[[1]]) #~22.4k
+```
+
+this step is for if we wanted bigrams (only) instead of unigrams.
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+toks_ngram <- tokens_ngrams(tokens_nopunc_nonum, n = 2)
+head(toks_ngram[[1]], 30)
+```
+While tokens_ngrams() generates n-grams or skip-grams in all possible combinations of tokens, tokens_compound() generates n-grams more selectively. For example, you can make negation bi-grams using phrase() and a wild card (*). In this case it was able to suggest patterns with the word "not_..." and only kept those suggested phrases. 
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+toks_neg_bigram <- tokens_compound(tokens_nopunc_nonum, pattern = phrase("not *"))
+toks_neg_bigram_select <- tokens_select(toks_neg_bigram, pattern = phrase("not_*"))
+head(toks_neg_bigram_select[[1]], 30)
+```
+
+Note that the material in Quanteda recommend using the *tokens_compound* command to get top tokens rather than the *tokens_ngrams*. 
+
+## Stemming 
+
+let's stem the document (uses Porter stemmer). You can see what package this is coming from an what stemmer it is using by doing ?tokens_wordstem
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+stemmed <- tokens_wordstem(tokens_all) #can inspect directly, if desired.
+# to see what's happened in practice, let's compare 'family' and 'families'.
+# So, compare
+tokens_all[[1]][grep("fam",tokens_all[[1]])]
+# to
+stemmed[[1]][grep("fam",stemmed[[1]])]
+```
+
+## Stopwords
+
+Stopwords include words that are used commonly so we might also want to remove the stopwords. 
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+stopwords("english")
+#and for that matter
+stopwords("german")
+```
+
+## Vector Space Representation 
+
+This step created a DFM matrix which includes the tokenize, stem and converting to lowercase in one document. 
+
+```{r, results = 'hide', echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+Lab_1983 <- corpus_subset(manifestos_corpus, docvar1=="Lab1983")
+Lab1983_vector <- tokens(Lab_1983)
+Lab1983_vector <- tokens_wordstem(Lab1983_vector)
+Lab1983_vector <- dfm(Lab1983_vector, tolower = TRUE)
+head(Lab1983_vector)
+```
+this step tokenize all documents, remove punctuation and remove stopwords then creates the DFM. The output contains 69 documents with 15,226 features
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+#alright, let's make a dfm of our whole Manifestos collection
+
+manifestos <- readtext("UK Manifestos/*.txt", docvarsfrom = c("filenames"))
+manifestos <- corpus(manifestos)
+
+dfmat_man <- tokens(manifestos, remove_punct = TRUE) |>
+  tokens_remove(stopwords("en")) |>
+  dfm()
+dfmat_man
+
+dfmat_man <- tokens(manifestos, remove_punct = TRUE) |>
+  tokens_remove(stopwords("en")) |>
+  dfm()
+dfmat_man
+
+dfmat_man_weighted <- dfm_tfidf(dfmat_man)
+
+topfeatures(dfmat_man)
+#with
+topfeatures(dfmat_man_weighted)
+# What is the main difference here?
+```
+The main difference is that topfeatures (dfmat_man) highlights common concepts like "government" and "people" that appear in several papers by displaying the most frequent words in the corpus. While the topfeatures(dfmat_man_weighted) uses TF-IDF, which down weighs common words and highlights words that are distinctive to particular documents, such as “nhs” or “liberal”. This means that raw frequency demonstrates the common language used while the TF-IDF identifies more informative language used. 
+
+### MACHINE LEARNING 
+
+loading the packages required 
+
+```{r, echo=TRUE, message = FALSE, error = FALSE, warning = FALSE}
+install.packages(c('caret','pander','gmodels','e1071','RTextTools'))
+# rm(list=ls())
+
+
+library(stringr)
+library(car)
+library(dplyr)
+library(caret) 
+
+#For Text Classification
+library(quanteda)
+library(readtext)
+library(quanteda.textmodels)
+```
+
+## Naive Bayes
+
+
+### Simple Naive Bayes example with Quanteda 
+
+First, lets load in Data and Turn into a corpus object using quanteda
+
+```{r}
+speeches <- readtext("Concession Speeches/*.txt")  #astrix means take everything
+speeches
+speeches_corpus <- corpus(speeches) # Corpus collection of documents
+speeches_corpus
+
+as.character(speeches_corpus[4]) # HILLARY CLINTON
+
+typeof(speeches_corpus)
+
+summary(speeches_corpus) # overview information 
+```
+
+this step retrieves the file names, year and speaker names from the information to add labels for classification. 
+
+```{r}
+nms <-names(speeches_corpus) #Get Filenames from corpus object
+nms
+speeches_corpus$Dates  <- paste(as.numeric(gsub('[^[:digit:]]','', names(speeches_corpus)))) # Get dates from file object
+speeches_corpus$Party <- str_sub(nms, start= -5, -5) # Get Party ID from file object, fifth from end
+speeches_corpus$PNames <- str_sub(nms, end = -12) #Get Name from file object
+summary(speeches_corpus)
+```
+
+Because we want to run a predictive models, probably want more data than 19 documents. Using quanteda, we can easily transform the corpus from the document level into the paragraph level and keep the doc variables. It counts the number of Democrat vs Republican paragraphs which gives 157 Democrats and 180 Republican 
+
+```{r}
+speeches_paragraph <- corpus_reshape(speeches_corpus, to = "paragraphs", use_docvars = TRUE) # Can also change to sentences
+summary(speeches_paragraph)
+```
+
+The corpus consisting of 337 documents Another thing that we may need to consider is the class balance as a slight imblanance will favour one party over the other.  
+
+```{r}
+table(speeches_paragraph$Party) # Check for Balance in Party Labels 
+#Dems 157
+#Reps  180 # Slightly more Republicans
+prop.d <- 157/337
+prop.r <- 1-prop.d
+prop.d 
+prop.r 
+
+#So what we can see is that there is a slight imbalance with our data, with more data from the Reps. We might expect that the classifier will over predict
+#the dominant class. 
+```
+
+###  clean the dataset 
+
+tokenisation of the data
+
+```{r}
+speech_tokens <- tokens(speeches_paragraph, remove_punct = TRUE, remove_symbols = TRUE, split_hyphens = TRUE, remove_numbers = TRUE) #turn them into individual words and punctuation
+speech_tokens #As we can see here, we now have a list of words
+speeches_clean <- tokens_wordstem(speech_tokens) # stem the words getting rid of endings
+speeches_clean <- tokens_remove(speeches_clean, pattern = c("applpaus", "applause")) #misspelling
+speeches_clean <- tokens_select(speeches_clean, c("*st", "*th", "*rd"), selection = "remove") # get rid of special endings like 43rd
+```
+# Creating the DFM 
+
+In this step, the tokens are converted into a DFM , where each row represents a paragraph and each column represents a unique word feature. The values in the matrix indicate how often each word appears in each document.Common English stopwords are then removed and then the features words are sorted alphabetically to ensure consistency and reproducibility in the dataset.
+
+```{r}
+speeches_clean <- dfm(speeches_clean)
+
+speeches_clean <- dfm_remove(speeches_clean,
+                      stopwords("english"))
+
+speeches_clean <- speeches_clean[, order(featnames(speeches_clean))]
+speeches_clean
+```
+
+### Running our first Naive Bayes model
+
+The dataset is split into two parts a training set and a test set. The first 268 documents  80% of the data are used to train the model, while the remaining 69 documents, 20% of the data are reserved for testing its performance.
+Both party labels are extracted for both the training and test sets. This allows the model to learn patterns from the training data and then be evaluated on unseen data.
+
+```{r}
+Concession_dfm_train <- speeches_clean[1:268, ] #80% of total observations
+Concession_dfm_test <- speeches_clean[269:337, ] #20% of total observations
+Concession_train_labels <- speeches_paragraph$Party[1:268]
+Concession_test_labels <- speeches_paragraph$Party[269:337]
+Concession_dfm_train
+Concession_train_labels[1:10]
+```
+
+Now we are going to apply a Naive Bayes model using Quanteda
+
+```{r}
+?textmodel_nb
+```
+
+A Naive Bayes model is trained using the training portion of the DFM along with the both party labels. This model learns the probability that a document belongs to a particular class based on the words it contains. The summary output provides details about the model, such as the estimated likelihood of each word given a class and the prior probabilities of each class. Classification is based on these probability.
+
+```{r}
+nb_model <- textmodel_nb(Concession_dfm_train, docvars(Concession_dfm_train, "Party"))
+summary(nb_model)
+```
+
+The test data is modified to make sure it contains the same set of words as the training data before predictions are made. this id due to the fact that the model can only generate predictions using the vocabulary it was trained on, this is essential.To ensure consistency between training and testing datasets, any missing features in the test set are added with zero values.
+
+```{r}
+dfmat_matched <- dfm_match(Concession_dfm_test, features = featnames(Concession_dfm_train)) #forcing keeping only features
+actual_class <- dfmat_matched$Party
+predicted_class <- predict(nb_model, newdata = dfmat_matched)
+```
+
+### Evaluation of model output 
+The predicted and real labels are compared using a confusion matrix. This enables us to assess the model's performance by displaying both accurate and inaccurate classifications.A confusion matrix is a table for visualizing how an algorithm performs with respect to the ``human gold-standard'' labels, using two dimensions (system output and gold labels), and each cell labeling a set of possible outcomes.
+
+
+top left: true positive
+bottom left: false negative
+
+top right: false negative
+bottom right: true negative
+
+```{r}
+tab_class <- table(predicted_class, actual_class)
+tab_class
+```
+#Accuracy, Precision, Recall
+
+```{r}
+cfm <- confusionMatrix(tab_class, mode="everything")
+cfm
+```
+### Try recoding with Boolean
+
+This step involves converting all non-zero values in the document-feature matrix to 1. As a result, the matrix now shows whether a word appears in a document rather than its frequency.
+When word presence is more informative than word frequency, this method can enhance performance and simplify the text's representation.
+
+```{r}
+?dfm_weight
+
+speeches_clean_bool <- dfm_weight(speeches_clean, scheme = "boolean") # recode all non-zero counts as 1
+
+
+Concession_dfm_bool_train <- speeches_clean_bool[1:268, ] #80% of total observations
+Concession_dfm_bool_test <- speeches_clean_bool[269:337, ] #20% of total observations
+
+
+Concession_train_labels <- speeches_paragraph$Party[1:268]
+Concession_test_labels <- speeches_paragraph$Party[269:337]
+
+nb_model_bool <- textmodel_nb(Concession_dfm_bool_train, docvars(Concession_dfm_train, "Party"), distribution = "multinomial")
+summary(nb_model_bool)
+
+dfmat_matched <- dfm_match(Concession_dfm_bool_test, features = featnames(Concession_dfm_bool_train)) #forcing keeping only features
+
+actual_class <- dfmat_matched$Party
+predicted_class <- predict(nb_model_bool, newdata = dfmat_matched)
+
+tab_class <- table(predicted_class, actual_class)
+tab_class
+
+cfm <- confusionMatrix(tab_class, mode="everything")
+cfm
+```
+### Bernoulli Naive Bayes
+
+The binary characteristics are used to train a Bernoulli Naive Bayes model. This variant clearly models whether a word occurs in a document rather than how frequently it occurs, in contrast to the traditional multinomial model.
+
+This method works especially well for shorter texts, such paragraphs, where a word's presence might convey more information than its frequency.This is why this model frequently performs better in categorisation.
+
+```{r}
+nb_model_bern <- textmodel_nb(Concession_dfm_bool_train, docvars(Concession_dfm_train, "Party"), distribution = "Bernoulli")
+summary(nb_model_bern)
+
+dfmat_matched <- dfm_match(Concession_dfm_bool_test, features = featnames(Concession_dfm_bool_train)) #forcing keeping only features
+
+actual_class <- dfmat_matched$Party
+predicted_class <- predict(nb_model_bern, newdata = dfmat_matched)
+
+
+tab_class <- table(predicted_class, actual_class)
+tab_class
+
+cfm <- confusionMatrix(tab_class, mode="everything")
+cfm
+```
+
+The investigation shows that classification performance can be greatly impacted by various feature formats and model specifications. The accuracy of the Naive Bayes model is significantly increased by utilising a Bernoulli distribution and translating features to binary form. This emphasises how crucial it is to match the modelling strategy to the data's structure, especially when dealing with brief text documents.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
